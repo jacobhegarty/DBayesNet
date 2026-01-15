@@ -98,7 +98,7 @@ head(data)
 
 The simplest form of DBN utilises a minimum and maximum Markov lag of one, meaning all learned arcs represent influence exerted a single time-step in the future. By default, `dbn_learn()` will learn this type of structure using a hill-climb search:
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 
 dnet <- dbn_learn(data,score = 'aic-g')
 print(dnet)
@@ -141,7 +141,7 @@ print(dnet)
 
 We can also plot our DBNs structure. By default this will plot the rolled version of the structure:
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 
 plot(dnet)
 
@@ -150,14 +150,14 @@ plot(dnet)
 
 We can also plot the unrolled structure, including whitelisted connections in grey using:
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 plot(dnet,roll=FALSE,whitelist=TRUE)
 
 ```
 
 This is particularly useful when plotting structures with more complex Markov lags:
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 
 dnet2 <- dbn_learn(data,score = 'aic-g',minMarkovLag = 2,maxMarkovLag = 3)
 
@@ -197,7 +197,7 @@ Column naming in unrolled data follows the convention X_t-L, where X is the vari
 
 Access to the components in this pipeline allow customised DBN structure learning analysis to be performed. For example, keeping track of the solution space whilst using random restarts:
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 library(bnlearn)
 #make unrolled dynamic data
 dData <- make_dynamic_data(data,minMarkovLag = 1, maxMarkovLag =2)
@@ -237,7 +237,7 @@ plot(unlist(scoresList),
 
 We are finding a solution with the same score regardless of where in the search space we start - this suggests that we are accessing the global optimum! A few simple checks (not shown here) will show us that these solutions are all equivalent graphs. We may now want to roll our bn object into a dbn object:
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 dnet3 <- roll_dbn(resList[[1]])
 
 plot(dnet3,roll=T)
@@ -292,7 +292,7 @@ data2 <- data.frame(
   )
 ```
 
-```{r,fig.width=8, fig.height=6,fig.retina = 2}
+```{r,fig.width=5.5, fig.height=4,fig.retina = 2}
 dnet4 <- dbn_learn(data2,score='aic-g',minMarkovLag=0,maxMarkovLag = 2)
 plot(dnet4,roll=F)
 ```
