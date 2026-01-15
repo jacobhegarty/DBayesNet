@@ -1,0 +1,299 @@
+---
+title: "DBayesNet"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{DBayesNet}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(DBayesNet)
+
+```
+
+# Introduction
+
+DBayesNet provides some helper functions to allow easy structure learning of dynamic Bayesian networks in R.  A dynamic Bayesian network (DBN) is a special case of a Bayesian network with temporal dependencies. Whereas a static Bayesian network (BN) represents dependence relationships between a set of variables, a DBN includes extra sets of lagged nodes from the minimum to maxim time lag (known as a Markov lag), representing the past of each variable. A few simple assumptions are utilised to constrain the DBN. Firstly, influence must be extended forwards in time. Secondly a variable at a must be dependent on itself at all previous lags in the network. Once learned a DBN may be 'rolled' up, to represent influence between nodes at any time lag. Unlike a static BN a rolled DBN can represent cyclic relationships and equivalence classes are not a concern as the direction of influence is always forwards in time. 
+
+The package `bnlearn` has extensive functionality for static Bayesian network analysis, but does not have functionality for dynamic networks. This utilises `bnlearn`'s structure learning with some additional constraints to learn Dynamic Bayesian network structures. For most uses the `dbn_learn()` function will suffice, but for more specialised applications other functions called by `dbn_learn()` are available to allow production of your own dynamic structure leaning pipeline.
+
+# Setup
+
+`DBayesNet` can be installed using `remotes`:
+
+```{r eval=FALSE, include=FALSE}
+remotes::install_github("jacobhegarty/DBayesNet")
+```
+
+And loaded:
+```{r}
+library(DBayesNet)
+```
+
+# Input data
+
+`dbn_learn()` accepts a dataframe with variables in columns and observations in rows. Observations are assumed to be in temporal order. Here we will use some toy data:
+
+```{r include=FALSE}
+
+##make some toy data
+set.seed(111)
+
+#initialise vars
+A <- numeric(1010)
+B <- numeric(1010)
+C <- numeric(1010)
+
+noiseFactor <- 0.05
+
+# initialise with small random values
+A[1:3] <- rnorm(3, 0, noiseFactor)
+B[1:3] <- rnorm(3, 0, noiseFactor)
+C[1:3] <- rnorm(3, 0, noiseFactor)
+
+for (t in 4:1010) {
+  epsA <- rnorm(1, 0,noiseFactor)
+  epsB <- rnorm(1, 0, noiseFactor)
+  epsC <- rnorm(1, 0, noiseFactor)
+  
+  # A_t depends on A_(t-1)
+  A[t] <- 0.6 * A[t - 1] + epsA
+  
+  # B_t depends on B_(t-1) and A_(t-2)
+  B[t] <- 0.5 * B[t - 1] + 0.4 * A[t - 2] + epsB
+  
+  # C_t depends on C_(t-1) and B_(t-1)
+  C[t] <- 0.3 * C[t - 1] + 0.3 * B[t - 1] + epsC
+}
+
+# drop burn-in
+A <- A[(11):1010]
+B <- B[(11):1010]
+C <- C[(11):1010]
+
+data <- data.frame(
+  A = A,
+  B = B,
+  C = C
+  )
+```
+
+```{r}
+head(data)
+
+```
+
+# Structure learning
+
+The simplest form of DBN utilises a minimum and maximum Markov lag of one, meaning all learned arcs represent influence exerted a single time-step in the future. By default, `dbn_learn()` will learn this type of structure using a hill-climb search:
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+
+dnet <- dbn_learn(data,score = 'aic-g')
+print(dnet)
+
+```
+
+But more complex DBN structures can also be learned through changing the `maxMarkovLag` and `minMarkovLag` parameters:
+
+```{r}
+
+dbn_learn(data,score = 'aic-g',minMarkovLag = 2,maxMarkovLag = 4)
+
+```
+
+`bnlearn` also offers a tabu search, which can also be accessed using the search parameter:
+
+```{r}
+
+dbn_learn(data,score = 'aic-g',search = "tabu")
+
+```
+
+Parameters can also be passed to `bnlearn`'s `hc()` or `tabu()`, which are used for structure learning uner-the-hood dependent on the value of search. For example, to perform a hill-climb search for the dynamic structure with random restarts:
+
+```{r}
+
+dbn_learn(data,score = 'aic-g',search = "hc",restart=10)
+
+```
+
+# Understanding learned structures
+
+`dbn_learn()` return an object of `dbn` class. `DBayesNet` provides some basic functions to aid in interpretation of the learned DBN structure. As shown in the previous example, calling `print()` on an object of class `dbn` will print some basic information on the rolled up structure of the DBN:
+
+```{r}
+
+print(dnet)
+
+```
+
+We can also plot our DBNs structure. By default this will plot the rolled version of the structure:
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+
+plot(dnet)
+
+```
+>The arrow argument can be used to control the distance between the arrow head and center of node. This may need to be fine-tuned for different graphs.
+
+We can also plot the unrolled structure, including whitelisted connections in grey using:
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+plot(dnet,roll=FALSE,whitelist=TRUE)
+
+```
+
+This is particularly useful when plotting structures with more complex Markov lags:
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+
+dnet2 <- dbn_learn(data,score = 'aic-g',minMarkovLag = 2,maxMarkovLag = 3)
+
+plot(dnet2,roll=FALSE,whitelist=TRUE)
+
+```
+
+An adjacency matrix representing the rolled up structure, with parent nodes in columns and child nodes in rows, can be generated using:
+
+
+```{r}
+as.adjacency.dbn(dnet)
+```
+
+Note that self connections are present in the adjacency matrix by definition of a DBN due to the whitelisted arcs.
+
+Finally, `arc.strength.dbn` is the dynamic equivalent of `bnlearn`'s `arc.strength`.
+
+```{r}
+arc.strength.dbn(dnet2,data)
+```
+
+> **Accessing bn object:**\
+> The dbn class contains the bn object in its second element. You can therefore access all bnlearn functionality:
+>
+> ```{r}
+> print(dnet[2])
+> #plot(dnet[[2]])
+> >
+> ```
+
+# Full pipeline
+
+`dbn_learn` wraps a number of functions which facilitate DBN structure learning: 1. `make_dynamic_data()` Coherences data with variables in columns and observations in rows into a dataframe with nVars \* (maxMarkovLag - minMarkovLag + 1) columns, where the new columns contain lagged versions of the origional variables from the minimum to maximum Markov Lag. 1. `make_wb_lists()` Produces the whitelist and blacklist to pass to a `bnlearn` structure learning function to force and prevent the necessary arcs for the output to be a dbn. 1. `roll_dbn()` rolls an object of `bn` which represents a dynamic structure into an object of class `bn`.
+
+Column naming in unrolled data follows the convention X_t-L, where X is the variable name and L the lag, other than at lag 0 which uses the convention X_t. It is vital that this convention is maintained throughout the pipeline for the functions to operate properly.
+
+Access to the components in this pipeline allow customised DBN structure learning analysis to be performed. For example, keeping track of the solution space whilst using random restarts:
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+library(bnlearn)
+#make unrolled dynamic data
+dData <- make_dynamic_data(data,minMarkovLag = 1, maxMarkovLag =2)
+
+#make whitelist and blacklist
+wb<- make_wb_lists(colnames(data),minMarkovLag =1,maxMarkovLag =2)
+
+whitelist <- wb[[1]]
+blacklist <- wb[[2]]
+
+#generate random structures for hill-climb starts
+start = random.graph(nodes = colnames(dData), num = 100, method = "ordered")
+
+#hill-climb from each random start point, saving results and scores
+RES <- lapply(start, function(net) {
+  res <- hc(dData,
+            whitelist = whitelist,
+            blacklist = blacklist,
+            score = 'aic-g',
+            start = net)
+  return(list(score = score(res, dData, type = "aic-g"), 
+              res = res))
+})
+scoresList <- lapply(RES, function(x) x$score)
+resList <- lapply(RES, function(x) x$res)
+
+#plot scores
+
+plot(unlist(scoresList),
+     type = "p",
+     pch = 16,
+     xlab = "Start index",
+     ylab = "Score",
+     main = "AIC Scores")
+
+```
+
+We are finding a solution with the same score regardless of where in the search space we start - this suggests that we are accessing the global optimum! A few simple checks (not shown here) will show us that these solutions are all equivalent graphs. We may now want to roll our bn object into a dbn object:
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+dnet3 <- roll_dbn(resList[[1]])
+
+plot(dnet3,roll=T)
+
+```
+
+# Intra-slice connections
+
+If the minimum Markov lag is set to 0 in these analysis, the functions will still operate but the output will not be a true DBN. This can be useful when the lag of the system is faster than the sampling resolution, for example in fMRI data. Importantly, the network will not be able to represent cyclic relationships within the same time-slice.
+
+
+```{r include=FALSE}
+
+##make some toy data with in slice dependencies
+
+#initialise vars
+A <- numeric(1010)
+B <- numeric(1010)
+C <- numeric(1010)
+
+noiseFactor <- 0.05
+
+# initialise with small random values
+A[1:3] <- rnorm(3, 0, noiseFactor)
+B[1:3] <- rnorm(3, 0, noiseFactor)
+C[1:3] <- rnorm(3, 0, noiseFactor)
+
+for (t in 4:1010) {
+  epsA <- rnorm(1, 0,noiseFactor)
+  epsB <- rnorm(1, 0, noiseFactor)
+  epsC <- rnorm(1, 0, noiseFactor)
+  
+  # A_t depends on A_(t-1)
+  A[t] <- 0.6 * A[t - 1] + epsA
+  
+  # B_t depends on B_(t-1) and A_t
+  B[t] <- 0.5 * B[t - 1] + 0.4 * A[t] + epsB
+  
+  # C_t depends on B_(t-1) and A_(t-2)
+  C[t] <- 0.3 * B[t - 1] + 0.3 * A[t - 1] + epsC
+}
+
+# drop burn-in
+A <- A[(11):1010]
+B <- B[(11):1010]
+C <- C[(11):1010]
+
+data2 <- data.frame(
+  A = A,
+  B = B,
+  C = C
+  )
+```
+
+```{r,fig.width=8, fig.height=6,fig.retina = 2}
+dnet4 <- dbn_learn(data2,score='aic-g',minMarkovLag=0,maxMarkovLag = 2)
+plot(dnet4,roll=F)
+```
+
