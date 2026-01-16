@@ -3,11 +3,11 @@ dbn <- function( bn,rolledArcs,maxMarkovLag,minMarkovLag ){
   dynamic <- list()
 
   #store basic dbn info
-  dynamic$rolledArcs <- rolledArcs
+  dynamic$rolledArcs <- rolledArcs |> dplyr::filter(to !=from)
   dynamic$learning$maxMarkovLag <- maxMarkovLag
   dynamic$learning$minMarkovLag <- minMarkovLag
 
-  #calculate number of ltime slices
+  #calculate number of time slices
   nLags <- if (minMarkovLag>0) (2+maxMarkovLag-minMarkovLag) else (1+maxMarkovLag-minMarkovLag)
 
   #variables in learning process
@@ -160,7 +160,7 @@ plot.dbn <- function( x,roll = T,whitelist = T, ylim = c(0, 1200), xlim = ylim, 
         }
       }
     }#IF WHITELIST
-    rolledArcs <- x$dbn$rolledArcs |> dplyr::filter(to!=from)
+    rolledArcs <- x$dbn$rolledArcs
     #separate in lag arcs as these will be curved
     crossLagArcs <-  rolledArcs[rolledArcs$lag != 0,]
     inLagArcs <-  rolledArcs[rolledArcs$lag == 0,]

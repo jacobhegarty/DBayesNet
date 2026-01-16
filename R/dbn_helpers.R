@@ -51,7 +51,8 @@ arc.strength.dbn <- function(x,data){
   #extract from lag
   lags <- data.frame(from = extract_lag(arcs$from))
   #extract node name
-  nodes <- data.frame(from = sub("_\\(t(?:-\\d+)?\\)$", "",arcs$from))
+  nodes <- data.frame(from = sub("_\\(t(?:-\\d+)?\\)$", "",arcs$from),
+                      to =  sub("_\\(t(?:-\\d+)?\\)$", "",arcs$to))
 
   return(data.frame(nodes,lag = lags$from,strength = arcs$strength))
 }
