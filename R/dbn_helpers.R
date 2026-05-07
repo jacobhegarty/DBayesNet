@@ -15,7 +15,7 @@ as.adjacency.dbn <- function(x) {
   rownames(adjMat) <- names(x$dbn$nodes)
 
   #fill adjMat using rolled arcs
-  for (i in seq(nrow(x$dbn$rolledArcs))){
+  for (i in seq_len(nrow(x$dbn$rolledArcs))){
     adjMat[x$dbn$rolledArcs$to[i],x$dbn$rolledArcs$from[i]] <- 1
   }
   #add one to diagonal - self links always present
